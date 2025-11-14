@@ -4,6 +4,7 @@ using namespace std;
 
 class Song;
 class Playlist;
+
 struct General {
     vector<Song> songs;
     vector<Playlist> playlists;
@@ -12,10 +13,27 @@ struct General {
 };
 
 void main_menu(General &general);
-void songs_list(General &general);
+void show_songs_list(General &general);
+void show_playlists_list(General &general);
+class Node{
+    Song song;
+    bool is_played;
+    Node *next;
+    Node *prev;
+};
 class Playlist{
+private:
+    Node *head;
 public:
     string name;
+    int count;
+    Playlist(){
+        head = nullptr;
+        count = 0;
+    }
+    void insert_song();
+    void remove_song();
+    void menu(General &general);
 };
 
 class Song{
@@ -43,11 +61,12 @@ void Song::menu(General &general){
     int choice;
     cout << "your choice: ";
     cin >> choice;
+    cout << "###############################################################\n";
     if(choice == 0){
         string last_page = general.back_history.top();
         general.back_history.pop();
-        if(last_page == "songs_list")
-            return songs_list(general);
+        if(last_page == "show_songs_list")
+            return show_songs_list(general);
 
             // to be continued for other pages
     }
@@ -82,7 +101,7 @@ void input_song(General &general){
     return main_menu(general);
 }
 
-void songs_list(General &general){
+void show_songs_list(General &general){
     int counter = 1;
     for (auto& song : general.songs) {
         cout << counter++ << ". " << song.name << ", by " << song.artist << endl;
@@ -94,9 +113,52 @@ void songs_list(General &general){
     if(choice == 0)
         return main_menu(general);
     else{
-        general.back_history.push("songs_list");
+        general.back_history.push("show_songs_list");
+        cout << "###############################################################\n";
         return general.songs[choice - 1].menu(general);
     }
+}
+void create_playlist(General &general){
+    string name;
+    bool flag = true;
+    while(flag){
+        flag = false;
+        cout << "enter a name for the new playlis: "; 
+        cin >> name;
+        for(auto playlist : general.playlists){
+            if(name == playlist.name){
+                cout << "playlist already exists" << endl;
+                flag = true;
+                break;
+            }
+        }
+    }
+    Playlist pl;
+    pl.name = name;
+    general.playlists.push_back(pl);
+    cout << "new playlist added to list" << endl;
+    cout << "###############################################################" << endl;
+    return show_playlists_list(general);
+}
+void show_playlists_list(General &general){
+    int counter = 1;
+    for (auto& playlist : general.playlists) {
+        cout << counter++ << ". " << playlist.name << endl;
+    }  
+    cout << "-1. add playlist" << endl << "0. back" << endl ;
+    int choice;
+    cout << "your choice: "; 
+    cin >> choice;
+    if(choice == 0)
+        return main_menu(general);
+    else if(choice == -1){
+        create_playlist(general);
+    }
+    else{
+        general.back_history.push("show_playlists_list");
+        cout << "###############################################################\n";
+        //return general.playlists[choice - 1].menu(general);
+    } 
 }
 
 void main_menu(General &general){
@@ -110,11 +172,16 @@ void main_menu(General &general){
         cout << "######################## SEE YOU SOON #########################" << endl;
         exit(0);
     }
-    else if(choice == 1){
-        return input_song(general); 
-    }
-    else if(choice == 2){
-        return songs_list(general);
+    else{
+        cout << "###############################################################\n";
+        if(choice == 1){
+            return input_song(general); 
+        }
+        else if(choice == 2){
+            return show_songs_list(general);
+        }
+        else if(choice == 3)
+            return show_playlists_list(general);
     }
 }
 
