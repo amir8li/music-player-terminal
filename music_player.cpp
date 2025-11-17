@@ -28,10 +28,11 @@ public:
         count = 0;
     }
     Playlist(const Playlist& other);
-    void insert_song(Node song, int ind);
+    ~Playlist();
+    void insert_song(Node &song, int ind, Song &original_song);
     void preppend_song(Node &song, Song &original_song);
-    void append_song(Node song);
-    void remove_song(Node song);
+    void append_song(Node &song, Song &original_song);
+    void remove_song(Song &original_song, int x);
     void print_list_of_songs();
     bool song_exist(string input_name, string input_artist);
     void menu(General &general);
@@ -46,6 +47,15 @@ public:
     Song(){
         playlists = new Playlist[10];
         playlist_count = 0;
+    }
+    Song(const Song& other) {
+        name = other.name;
+        artist = other.artist;
+        playlist_count = other.playlist_count;
+        playlists = new Playlist[10];
+        for(int i = 0; i < other.playlist_count; ++i) {
+            playlists[i] = other.playlists[i];
+        }
     }
     ~Song(){
         delete[] playlists;
@@ -84,6 +94,48 @@ void Playlist::menu(General &general){
                 }
             }
         }
+    }
+    else if(choice == -1){
+        if(count == 0){
+            cout << "no song to remove" << endl;
+            return this->menu(general);
+        }
+        print_list_of_songs();
+        cout << "which song: " ;
+        int x;
+        while (true) {
+            string line;
+            getline(cin >> ws, line);
+            try {
+                size_t pos = 0;
+                long val = stol(line, &pos);
+                if(pos != line.size()){
+                    cout << "please enter a valid integer" << endl;
+                    continue;
+                }
+                x = static_cast<int>(val);
+                break;
+            }catch(...){
+                cout << "please enter a valid integer" << endl;
+            }
+        }
+        if(x <= 1)
+            x = 1;
+        else if(x >= count)
+            x = count;
+        Node *itr = head;
+        for(int i = 1; i < x; ++i){
+            itr = itr->next;
+        }
+        Song *real_song = nullptr;
+        for(int i = 0; i < general.songs.size(); ++i){
+            if(general.songs[i].name == itr->song.name && general.songs[i].artist == itr->song.artist){
+                real_song = &general.songs[i];
+                break;
+            }
+        }
+        remove_song(*real_song, x);
+        return this->menu(general);
     }
     // other options 
     else{
@@ -159,6 +211,114 @@ void Playlist::preppend_song(Node &song, Song &original_song){
     ++count;
     original_song.playlists[original_song.playlist_count++] = *this;
 }
+void Playlist::append_song(Node &song, Song &original_song){
+    Node *newNode = new Node;
+    newNode->song = song.song;
+    newNode->is_played = song.is_played;
+    if(count == 0){
+        newNode->next = newNode;
+        newNode->prev = newNode;
+        head = newNode;
+    }
+    else{
+        Node *tail = head->prev;
+        newNode->next = head;
+        newNode->prev = tail;
+        tail->next = newNode;
+        head->prev = newNode;
+    }
+    ++count;
+    original_song.playlists[original_song.playlist_count++] = *this;
+}
+void Playlist::insert_song(Node &song, int ind, Song &original_song){
+    Node *newNode = new Node;
+    newNode->song = song.song;
+    newNode->is_played = song.is_played;
+
+    Node *itr = head;
+    for(int i = 1; i < ind - 1; ++i){
+        itr = itr->next;
+    }
+
+    newNode->next = itr->next;
+    newNode->prev = itr;
+    itr->next->prev = newNode;
+    itr->next = newNode;
+    ++count;
+    original_song.playlists[original_song.playlist_count++] = *this;
+}
+Playlist::~Playlist(){
+    if(head == nullptr) return;
+    Node *current = head;
+    Node *nextNode;
+
+    do {
+        nextNode = current->next;
+        delete current;
+        current = nextNode;
+    } while (current != head);
+}
+void Playlist::remove_song(Song &original_song, int x){
+    if(x <= 1){
+        if(count == 1){
+            head->song.playlists = nullptr;
+            delete head;
+            head = nullptr;
+            count = 0;
+        }
+        else{
+            Node *tail = head->prev;
+            Node *toDelete = head;
+            head = head->next;
+            tail->next = head;
+            head->prev = tail;
+            toDelete->song.playlists = nullptr;
+            delete toDelete;
+            count--;
+        }
+    }
+    else if(x >= count){
+        if(count == 1){
+            head->song.playlists = nullptr;
+            delete head;
+            head = nullptr;
+            count = 0;
+        }
+        else{
+            Node *tail = head->prev;
+            Node *toDelete = tail;
+            Node *newTail = tail->prev;
+            newTail->next = head;
+            head->prev = newTail;
+            toDelete->song.playlists = nullptr;
+            delete toDelete;
+            count--;
+        }
+    }
+    else{
+        Node *itr = head;
+        for(int i = 1; i < x; ++i){
+            itr = itr->next;
+        }
+        Node *toDelete = itr;
+        itr->prev->next = itr->next;
+        itr->next->prev = itr->prev;
+        toDelete->song.playlists = nullptr;
+        delete toDelete;
+        count--;
+    }
+    cout << "song deleted from playlist" << endl;
+    cout << "###############################################################\n";
+    for(int i = 0; i < original_song.playlist_count; ++i){
+        if(original_song.playlists[i].name == this->name){
+            for(int j = i; j < original_song.playlist_count - 1; ++j){
+                original_song.playlists[j] = original_song.playlists[j + 1];
+            }
+            --original_song.playlist_count;
+            break;
+        }
+    }
+}
 void Song::menu(General &general){
     cout << "song name: " << name << endl;
     cout << "1. list of playlists \n2. add to playlist \n3. add to queue \n0. back" << endl;
@@ -218,19 +378,12 @@ void Song::menu(General &general){
             while (true) {
                 cout << "where do you want to add it? ";
                 string line;
-                if(!getline(cin >> ws, line)){
-                    cout << "input error, try again" << endl;
-                    continue;
-                }
+                getline(cin >> ws, line);
                 try {
                     size_t pos = 0;
                     long val = stol(line, &pos);
                     if(pos != line.size()){
-                        cout << "please enter a valid integer (no extra chars)" << endl;
-                        continue;
-                    }
-                    if(val < INT_MIN || val > INT_MAX){
-                        cout << "integer out of range, try again" << endl;
+                        cout << "please enter a valid integer" << endl;
                         continue;
                     }
                     x = static_cast<int>(val);
@@ -244,11 +397,11 @@ void Song::menu(General &general){
             if (x < 1) {
                 tmp.preppend_song(song_node, *this);
             }
-            else if (x > tmp.count) {
-                //tmp.append_song(song_node);
+            else if (x >= tmp.count) {
+                tmp.append_song(song_node, *this);
             }
             else {
-                //tmp.insert_song(song_node, x);
+                tmp.insert_song(song_node, x, *this);
             }
             cout << "song added to playlist" << endl;
             cout << "###############################################################\n";
