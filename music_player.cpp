@@ -29,10 +29,10 @@ public:
     }
     Playlist(const Playlist& other);
     ~Playlist();
-    void insert_song(Node &song, int ind, Song &original_song);
-    void preppend_song(Node &song, Song &original_song);
-    void append_song(Node &song, Song &original_song);
-    void remove_song(Song &original_song, int x);
+    void insert_song(Song *song_ptr, int ind);
+    void preppend_song(Song *song_ptr);
+    void append_song(Song *song_ptr);
+    void remove_song(Song *original_song, int x);
     void print_list_of_songs();
     bool song_exist(string input_name, string input_artist);
     void menu(General &general);
@@ -43,9 +43,7 @@ public:
     string name;
     string artist;
     vector<Playlist*> playlists;
-    Song(){
-        
-    }
+    Song(){}
     Song(const Song& other) {
         name = other.name;
         artist = other.artist;
@@ -57,7 +55,7 @@ public:
 };
 class Node{
 public:
-    Song song;
+    Song *song;
     bool is_played;
     Node *next;
     Node *prev;
@@ -118,14 +116,14 @@ void Playlist::menu(General &general){
         for(int i = 1; i < x; ++i){
             itr = itr->next;
         }
-        Song *real_song = nullptr;
-        for(int i = 0; i < general.songs.size(); ++i){
-            if(general.songs[i].name == itr->song.name && general.songs[i].artist == itr->song.artist){
-                real_song = &general.songs[i];
-                break;
-            }
-        }
-        remove_song(*real_song, x);
+        // Song *real_song = nullptr;
+        // for(int i = 0; i < general.songs.size(); ++i){
+        //     if(general.songs[i].name == itr->song->name && general.songs[i].artist == itr->song->artist){
+        //         real_song = &general.songs[i];
+        //         break;
+        //     }
+        // }
+        remove_song(itr->song, x);
         return this->menu(general);
     }
     // other options
@@ -145,7 +143,7 @@ void Playlist::menu(General &general){
 
         Song *real_song = nullptr;
         for (int i = 0; i < general.songs.size(); ++i) {
-            if (general.songs[i].name == itr->song.name && general.songs[i].artist == itr->song.artist) {
+            if (general.songs[i].name == itr->song->name && general.songs[i].artist == itr->song->artist) {
                 real_song = &general.songs[i];
                 break;
             }
@@ -155,7 +153,6 @@ void Playlist::menu(General &general){
             return real_song->menu(general);
         }
         else {
-            // fallback: nothing matched, return to this menu
             return this->menu(general);
         }
     }
@@ -198,7 +195,7 @@ bool Playlist::song_exist(string input_name, string input_artist){
     if(head == nullptr) return false;
     Node *itr = head;
     do{
-        if(itr->song.name == input_name && itr->song.artist == input_artist)
+        if(itr->song->name == input_name && itr->song->artist == input_artist)
             return true;
         itr = itr->next;
     }while(itr != nullptr && itr != head);
@@ -212,14 +209,14 @@ void Playlist::print_list_of_songs(){
     Node *itr = head;
     int counter = 1;
     do{
-        cout << counter++ << ". " << itr->song.name << ", by " << itr->song.artist << endl;
+        cout << counter++ << ". " << itr->song->name << ", by " << itr->song->artist << endl;
         itr = itr->next;
     }while(itr != nullptr && itr != head);
 }
-void Playlist::preppend_song(Node &song, Song &original_song){
+void Playlist::preppend_song(Song *song_ptr){
     Node *newNode = new Node;
-    newNode->song = song.song;
-    newNode->is_played = song.is_played;
+    newNode->song = song_ptr;
+    newNode->is_played = false;
     if(count == 0){
         newNode->next = newNode;
         newNode->prev = newNode;
@@ -235,10 +232,10 @@ void Playlist::preppend_song(Node &song, Song &original_song){
     }
     ++count;
 }
-void Playlist::append_song(Node &song, Song &original_song){
+void Playlist::append_song(Song *song_ptr){
     Node *newNode = new Node;
-    newNode->song = song.song;
-    newNode->is_played = song.is_played;
+    newNode->song = song_ptr;
+    newNode->is_played = false;
     if(count == 0){
         newNode->next = newNode;
         newNode->prev = newNode;
@@ -253,10 +250,10 @@ void Playlist::append_song(Node &song, Song &original_song){
     }
     ++count;
 }
-void Playlist::insert_song(Node &song, int ind, Song &original_song){
+void Playlist::insert_song(Song *song_ptr, int ind){
     Node *newNode = new Node;
-    newNode->song = song.song;
-    newNode->is_played = song.is_played;
+    newNode->song = song_ptr;
+    newNode->is_played = false;
 
     Node *itr = head;
     for(int i = 1; i < ind - 1; ++i){
@@ -280,7 +277,7 @@ Playlist::~Playlist(){
         current = nextNode;
     } while (current != head);
 }
-void Playlist::remove_song(Song &original_song, int x){
+void Playlist::remove_song(Song *original_song, int x){
     if(x <= 1){
         if(count == 1){
             delete head;
@@ -326,9 +323,9 @@ void Playlist::remove_song(Song &original_song, int x){
     }
     cout << "song deleted from playlist" << endl;
     cout << "###############################################################\n";
-    for(size_t i = 0; i < original_song.playlists.size(); ++i){
-        if(original_song.playlists[i]->name == this->name){
-            original_song.playlists.erase(original_song.playlists.begin() + i);
+    for(int i = 0; i < original_song->playlists.size(); ++i){
+        if(original_song->playlists[i]->name == this->name){
+            original_song->playlists.erase(original_song->playlists.begin() + i);
             break;
         }
     }
@@ -406,18 +403,15 @@ void Song::menu(General &general){
                     cout << "please enter a valid integer" << endl;
                 }
             }
-            Node song_node;
-            song_node.song = *this;
             if (x < 1) {
-                tmp.preppend_song(song_node, *this);
+                tmp.preppend_song(this);
             }
             else if (x >= tmp.count) {
-                tmp.append_song(song_node, *this);
+                tmp.append_song(this);
             }
             else {
-                tmp.insert_song(song_node, x, *this);
+                tmp.insert_song(this, x);
             }
-            // store pointer to the canonical playlist in the song
             this->playlists.push_back(&general.playlists[found_index]);
             cout << "song added to playlist" << endl;
             cout << "###############################################################\n";
