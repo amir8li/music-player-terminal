@@ -171,14 +171,28 @@ void Playlist::menu(General &general){
                 break;
             }
         }
-        if(general.is_playing && general.now_playing_playlist_index == playlist_index){
-            PlaylistState state;
-            state.playlist_name = this->name;
-            state.count_songs_played = this->count_songs_played;
-            state.is_played_map = this->is_played_map;
-            state.last_song_played = this->last_song_played;
-            state.current_node = general.now_playing_node;
-            general.playlist_state_stack.push(state);
+        if(general.is_playing){
+            stack<string> temp;
+            while(!general.sourcery_reserve.empty()){
+                string val = general.sourcery_reserve.top();
+                general.sourcery_reserve.pop();
+
+                if(val == this->name){
+                    PlaylistState state;
+                    state.playlist_name = this->name;
+                    state.count_songs_played = this->count_songs_played;
+                    state.is_played_map = this->is_played_map;
+                    state.last_song_played = this->last_song_played;
+                    state.current_node = general.now_playing_node;
+                    general.playlist_state_stack.push(state);
+                }
+
+                temp.push(val);
+            }
+            while(!temp.empty()){
+                general.sourcery_reserve.push(temp.top());
+                temp.pop();
+            } 
         }
         count_songs_played = 0;
         for(auto &entry : is_played_map){
