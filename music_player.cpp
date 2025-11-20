@@ -10,50 +10,65 @@ void print_playbar(General &general){
             // PLAY FROM SOURCE QUEUE
         }
         else{
-            for(auto playlist : general.playlists){
-                if(playlist.name == general.sourcery_reserve.top()){
-                    general.now_playing_playlist = &playlist;
-                    if(general.now_playing_playlist->last_song_played != nullptr)
-                        general.now_playing_node = general.now_playing_playlist->last_song_played;
-                    break;
+            if(general.now_playing_playlist_index == -1 || general.playlists[general.now_playing_playlist_index].name != general.sourcery_reserve.top()){
+                for(int i = 0; i < general.playlists.size(); ++i){
+                    if(general.playlists[i].name == general.sourcery_reserve.top()){
+                        general.now_playing_playlist_index = i;
+                        if(general.playlists[i].last_song_played != nullptr)
+                            general.now_playing_node = general.playlists[i].last_song_played;
+                        break;
+                    }
                 }
             }
-            if(!general.is_playing || general.now_playing_playlist->count == general.now_playing_playlist->count_songs_played){
-                general.now_playing_playlist->count_songs_played = 0;
-                general.sourcery_reserve.pop();
-                cout << "###############################################################" << endl;
-                return;
+            if(general.now_playing_playlist_index != -1){
+                Playlist &now_playing = general.playlists[general.now_playing_playlist_index];
+                if(!general.is_playing || now_playing.count == now_playing.count_songs_played){
+                    now_playing.count_songs_played = 0;
+                    general.sourcery_reserve.pop();
+                    for(auto &it : now_playing.is_played_map){
+                        it.second = false;
+                    }
+                    general.now_playing_playlist_index = -1;
+                    cout << "###############################################################" << endl;
+                    return;
+                }
+                cout << "------------------------------------------------" << endl;
+                cout << "Song Playing: " << general.now_playing_node->song->name << " - " << general.now_playing_node->song->artist << endl;
+                cout << ">. Next \n<. Prev" << endl;
+                now_playing.last_song_played = general.now_playing_node;
+                cout << "------------------------------------------------" << endl;
+                if(!now_playing.is_played_map[general.now_playing_node->song->name + " - " + general.now_playing_node->song->artist]){
+                    now_playing.is_played_map[general.now_playing_node->song->name + " - " + general.now_playing_node->song->artist] = true;
+                    now_playing.count_songs_played++;
+                }
+                // cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n";
+                // for(auto tmp : now_playing.is_played_map)
+                //     cout << "song: " << tmp.first << " is played: " << tmp.second << endl;
+                // cout << "count songs played: " << now_playing.count_songs_played << "/count :" << now_playing.count << endl;
+                // cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n";
             }
-            cout << "------------------------------------------------" << endl;
-            cout << "Song Playing: " << general.now_playing_node->song->name << " - " << general.now_playing_node->song->artist << endl;
-            cout << ">. Next \n<. Prev" << endl;
-            general.now_playing_playlist->last_song_played = general.now_playing_node;
-            cout << "------------------------------------------------" << endl;
-            if(!general.now_playing_playlist->is_played_map[general.now_playing_node->song]){
-                general.now_playing_playlist->is_played_map[general.now_playing_node->song] = true;
-                general.now_playing_playlist->count_songs_played++;
-            }
-            cout << "count songs played: " << general.now_playing_playlist->count_songs_played << "/count :" << general.now_playing_playlist->count << endl;
         }
     }
     else{
         general.is_playing = false;
-        general.now_playing_playlist = nullptr;
+        general.now_playing_playlist_index = -1;
         general.now_playing_node = nullptr;
     }
 }
 void next_song(General &general){
     if(!general.is_playing || general.now_playing_node == nullptr) return;
     general.now_playing_node = general.now_playing_node->next;
+    // cout << "Song Playing: " << general.now_playing_node->song->name << " - " << general.now_playing_node->song->artist << endl;
 }
 void prev_song(General &general){
     if(!general.is_playing || general.now_playing_node == nullptr) return;
     general.now_playing_node = general.now_playing_node->prev;
+    // cout << "Song Playing: " << general.now_playing_node->song->name << " - " << general.now_playing_node->song->artist << endl;
 }
-void start_playing(General &general, Playlist *pl, Node *node){
-    if(pl == nullptr || node == nullptr) return;
+void start_playing(General &general, int playlist_index, Node *node){
+    if(playlist_index < 0 || playlist_index >= general.playlists.size() || node == nullptr) return;
     general.is_playing = true;
-    general.now_playing_playlist = pl;
+    general.now_playing_playlist_index = playlist_index;
     general.now_playing_node = node;
 }
 void Playlist::menu(General &general){
@@ -81,9 +96,9 @@ void Playlist::menu(General &general){
         // to be continued for other pages
         else{
             for(int i = 0; i < general.songs.size(); ++i){
-                if(general.songs[i].name == last_page){
+                if(general.songs[i]->name == last_page){
                     cout << "###############################################################\n";
-                    return general.songs[i].menu(general);
+                    return general.songs[i]->menu(general);
                 }
             }
         }
@@ -129,7 +144,14 @@ void Playlist::menu(General &general){
         }
         cout << "###############################################################\n";
         general.sourcery_reserve.push(this->name);
-        start_playing(general, this, itr);
+        int playlist_index = -1;
+        for(int i = 0; i < general.playlists.size(); ++i){
+            if(general.playlists[i].name == this->name){
+                playlist_index = i;
+                break;
+            }
+        }
+        start_playing(general, playlist_index, itr);
         return this->menu(general);
     }
     else{
@@ -146,10 +168,10 @@ void Playlist::menu(General &general){
             itr = itr->next;
         }
 
-        Song *real_song = nullptr;
+        shared_ptr<Song> real_song;
         for (int i = 0; i < general.songs.size(); ++i) {
-            if (general.songs[i].name == itr->song->name && general.songs[i].artist == itr->song->artist) {
-                real_song = &general.songs[i];
+            if (general.songs[i]->name == itr->song->name && general.songs[i]->artist == itr->song->artist) {
+                real_song = general.songs[i];
                 break;
             }
         }
@@ -220,7 +242,7 @@ void Playlist::print_list_of_songs(){
         itr = itr->next;
     }while(itr != nullptr && itr != head);
 }
-void Playlist::preppend_song(Song *song_ptr){
+void Playlist::preppend_song(shared_ptr<Song> song_ptr){
     Node *newNode = new Node;
     newNode->song = song_ptr;
     if(count == 0){
@@ -238,7 +260,7 @@ void Playlist::preppend_song(Song *song_ptr){
     }
     ++count;
 }
-void Playlist::append_song(Song *song_ptr){
+void Playlist::append_song(shared_ptr<Song> song_ptr){
     Node *newNode = new Node;
     newNode->song = song_ptr;
     if(count == 0){
@@ -255,7 +277,7 @@ void Playlist::append_song(Song *song_ptr){
     }
     ++count;
 }
-void Playlist::insert_song(Song *song_ptr, int ind){
+void Playlist::insert_song(shared_ptr<Song> song_ptr, int ind){
     Node *newNode = new Node;
     newNode->song = song_ptr;
     Node *itr = head;
@@ -280,7 +302,7 @@ Playlist::~Playlist(){
         current = nextNode;
     } while (current != head);
 }
-void Playlist::remove_song(Song *original_song, int x){
+void Playlist::remove_song(shared_ptr<Song> original_song, int x){
     if(x <= 1){
         if(count == 1){
             delete head;
@@ -327,14 +349,15 @@ void Playlist::remove_song(Song *original_song, int x){
     cout << "song deleted from playlist" << endl;
     cout << "###############################################################\n";
     for(int i = 0; i < original_song->playlists.size(); ++i){
-        if(original_song->playlists[i]->name == this->name){
+        if(original_song->playlists[i] == this->name){
             original_song->playlists.erase(original_song->playlists.begin() + i);
             break;
         }
     }
-    if(is_played_map[original_song])
+    string song_key = original_song->name + " - " + original_song->artist;
+    if(is_played_map[song_key])
         count_songs_played--;
-    is_played_map.erase(original_song);
+    is_played_map.erase(song_key);
 }
 void Song::menu(General &general){
     print_playbar(general);
@@ -401,19 +424,27 @@ void Song::menu(General &general){
             tmp.print_list_of_songs();
             cout << "where do you want to add it?" << endl;
             int x = check_int();
+            shared_ptr<Song> self;
+
+            for(auto &s : general.songs){
+                if(s.get() == this){   
+                    self = s;
+                    break;
+                }
+            }
             if (x < 1) {
-                tmp.preppend_song(this);
+                tmp.preppend_song(self);
             }
             else if (x >= tmp.count) {
-                tmp.append_song(this);
+                tmp.append_song(self);
             }
             else {
-                tmp.insert_song(this, x);
+                tmp.insert_song(self, x);
             }
-            this->playlists.push_back(&general.playlists[found_index]);
+            this->playlists.push_back(general.playlists[found_index].name);
             cout << "song added to playlist" << endl;
             cout << "###############################################################\n";
-            tmp.is_played_map.insert({this, false});
+            tmp.is_played_map.insert({this->name + " - " + this->artist, false});
             return menu(general);
         }
     }
@@ -425,7 +456,7 @@ void Song::write_playlists_of_song(General &general){
     print_playbar(general);
     cout << "Playlists containing this song:" << endl;
     for (int i = 0; i < playlists.size(); ++i) {
-        cout << i + 1 << ". " << playlists[i]->name << endl;
+        cout << i + 1 << ". " << playlists[i] << endl;
     }
     cout << "0. back" << endl;
     string choice;
@@ -442,15 +473,23 @@ void Song::write_playlists_of_song(General &general){
     if(parsedChoice == 0)
         return menu(general);
     general.back_history.push(this->name);
-    return playlists[parsedChoice - 1]->menu(general);
+    {
+        string chosen = playlists[parsedChoice - 1];
+        int idx = -1;
+        for (int i = 0; i < general.playlists.size(); ++i) {
+            if (general.playlists[i].name == chosen) { idx = i; break; }
+        }
+        if (idx != -1) return general.playlists[idx].menu(general);
+        else return write_playlists_of_song(general);
+    }
 }
 
 void input_song(General &general){
-    Song song;
+    auto song = make_shared<Song>();
     cout << "Enter the name of the song: ";
-    cin >> song.name;
+    cin >> song->name;
     cout << "Enter the name of the artist: ";
-    cin >> song.artist;
+    cin >> song->artist;
     general.songs.push_back(song);
     cout << "Song successfully added to your songs list." << endl;
     return main_menu(general);
@@ -460,7 +499,7 @@ void show_songs_list(General &general){
     print_playbar(general);
     int counter = 1;
     for (auto& song : general.songs) {
-        cout << counter++ << ". " << song.name << ", by " << song.artist << endl;
+        cout << counter++ << ". " << song->name << ", by " << song->artist << endl;
     }
     cout << "0. back" << endl;
     string choice;
@@ -478,7 +517,7 @@ void show_songs_list(General &general){
     else{
         general.back_history.push("show_songs_list");
         cout << "###############################################################\n";
-        return general.songs[parsedChoice - 1].menu(general);
+        return general.songs[parsedChoice - 1]->menu(general);
     }
 }
 void create_playlist(General &general){

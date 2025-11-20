@@ -8,12 +8,12 @@ class Node;
 
 struct General{
     bool welcome_shown = false;
-    vector<Song> songs;
+    vector<shared_ptr<Song>> songs;
     vector<Playlist> playlists;
-    queue<Song> q;
+    queue<shared_ptr<Song>> q;
     stack<string> back_history;
     stack<string> sourcery_reserve;
-    Playlist *now_playing_playlist = nullptr;
+    int now_playing_playlist_index = -1;
     Node *now_playing_node = nullptr;
     bool is_playing = false;
 };
@@ -30,7 +30,7 @@ int check_int();
 void print_playbar(General &general);
 void next_song(General &general);
 void prev_song(General &general);
-void start_playing(General &general, Playlist *pl, Node *node);
+void start_playing(General &general, int playlist_index, Node *node);
 bool try_parse_int(const string &s, int &out);
 
 class Playlist{
@@ -41,7 +41,7 @@ public:
     string name;
     int count;
     int count_songs_played;
-    map<Song*, bool> is_played_map;
+    map<string, bool> is_played_map;
     Node *last_song_played;
     Playlist(){
         head = nullptr;
@@ -51,10 +51,10 @@ public:
     }
     Playlist(const Playlist& other);
     ~Playlist();
-    void insert_song(Song *song_ptr, int ind);
-    void preppend_song(Song *song_ptr);
-    void append_song(Song *song_ptr);
-    void remove_song(Song *original_song, int x);
+    void insert_song(shared_ptr<Song> song_ptr, int ind);
+    void preppend_song(shared_ptr<Song> song_ptr);
+    void append_song(shared_ptr<Song> song_ptr);
+    void remove_song(shared_ptr<Song> original_song, int x);
     void print_list_of_songs();
     bool song_exist(string input_name, string input_artist);
     void menu(General &general);
@@ -64,7 +64,7 @@ class Song{
 public:
     string name;
     string artist;
-    vector<Playlist*> playlists;
+    vector<string> playlists;
     Song(){}
     Song(const Song& other) {
         name = other.name;
@@ -79,7 +79,7 @@ public:
 
 class Node{
 public:
-    Song *song;
+    shared_ptr<Song> song;
     Node *next;
     Node *prev;
 };
