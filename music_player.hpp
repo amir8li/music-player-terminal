@@ -6,6 +6,14 @@ class Song;
 class Playlist;
 class Node;
 
+struct PlaylistState{
+    string playlist_name;
+    int count_songs_played = 0;
+    map<string, bool> is_played_map;
+    Node *last_song_played = nullptr;
+    Node *current_node = nullptr;
+};
+
 struct General{
     bool welcome_shown = false;
     vector<shared_ptr<Song>> songs;
@@ -13,9 +21,11 @@ struct General{
     queue<shared_ptr<Song>> q;
     stack<string> back_history;
     stack<string> sourcery_reserve;
+    stack<PlaylistState> playlist_state_stack;
     int now_playing_playlist_index = -1;
     Node *now_playing_node = nullptr;
     bool is_playing = false;
+    bool is_current_playlist_done = false;
 };
 
 enum SourceType{ 

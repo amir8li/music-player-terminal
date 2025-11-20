@@ -23,19 +23,33 @@ void print_playbar(General &general){
             if(general.now_playing_playlist_index != -1){
                 Playlist &now_playing = general.playlists[general.now_playing_playlist_index];
                 if(!general.is_playing || now_playing.count == now_playing.count_songs_played){
-                    now_playing.count_songs_played = 0;
                     general.sourcery_reserve.pop();
-                    for(auto &it : now_playing.is_played_map){
-                        it.second = false;
+                    if(!general.playlist_state_stack.empty() && general.playlist_state_stack.top().playlist_name == now_playing.name){
+                        PlaylistState restored = general.playlist_state_stack.top();
+                        general.playlist_state_stack.pop();
+                        now_playing.count_songs_played = restored.count_songs_played;
+                        now_playing.is_played_map = restored.is_played_map;
+                        now_playing.last_song_played = restored.last_song_played;
+                        general.now_playing_node = restored.current_node;
+                    }else{
+                        now_playing.count_songs_played = 0;
+                        for(auto &it : now_playing.is_played_map){
+                            it.second = false;
+                        }
+                        now_playing.last_song_played = nullptr;
                     }
                     general.now_playing_playlist_index = -1;
                     cout << "###############################################################" << endl;
+                    if(!general.sourcery_reserve.empty() && general.is_current_playlist_done){
+                        return print_playbar(general);
+                    }
                     return;
                 }
                 cout << "------------------------------------------------" << endl;
                 cout << "Song Playing: " << general.now_playing_node->song->name << " - " << general.now_playing_node->song->artist << endl;
+                cout << "source: " << now_playing.name << endl;
                 cout << ">. Next \n<. Prev" << endl;
-                now_playing.last_song_played = general.now_playing_node;
+                now_playing.last_song_played = general.now_playing_node->next;
                 cout << "------------------------------------------------" << endl;
                 if(!now_playing.is_played_map[general.now_playing_node->song->name + " - " + general.now_playing_node->song->artist]){
                     now_playing.is_played_map[general.now_playing_node->song->name + " - " + general.now_playing_node->song->artist] = true;
@@ -58,11 +72,17 @@ void print_playbar(General &general){
 void next_song(General &general){
     if(!general.is_playing || general.now_playing_node == nullptr) return;
     general.now_playing_node = general.now_playing_node->next;
+    if(general.playlists[general.now_playing_playlist_index].count == general.playlists[general.now_playing_playlist_index].count_songs_played){
+        general.is_current_playlist_done = true;
+    }
     // cout << "Song Playing: " << general.now_playing_node->song->name << " - " << general.now_playing_node->song->artist << endl;
 }
 void prev_song(General &general){
     if(!general.is_playing || general.now_playing_node == nullptr) return;
     general.now_playing_node = general.now_playing_node->prev;
+    if(general.playlists[general.now_playing_playlist_index].count == general.playlists[general.now_playing_playlist_index].count_songs_played){
+        general.is_current_playlist_done = true;
+    }
     // cout << "Song Playing: " << general.now_playing_node->song->name << " - " << general.now_playing_node->song->artist << endl;
 }
 void start_playing(General &general, int playlist_index, Node *node){
@@ -151,6 +171,20 @@ void Playlist::menu(General &general){
                 break;
             }
         }
+        if(general.is_playing && general.now_playing_playlist_index == playlist_index){
+            PlaylistState state;
+            state.playlist_name = this->name;
+            state.count_songs_played = this->count_songs_played;
+            state.is_played_map = this->is_played_map;
+            state.last_song_played = this->last_song_played;
+            state.current_node = general.now_playing_node;
+            general.playlist_state_stack.push(state);
+        }
+        count_songs_played = 0;
+        for(auto &entry : is_played_map){
+            entry.second = false;
+        }
+        last_song_played = nullptr;
         start_playing(general, playlist_index, itr);
         return this->menu(general);
     }
@@ -641,6 +675,7 @@ bool try_parse_int(const string &s, int &out){
 //--------------------------------------
 int main(){
     General general;
+
     main_menu(general);
     return 0;
 }
