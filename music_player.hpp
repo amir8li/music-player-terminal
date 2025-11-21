@@ -42,6 +42,8 @@ void next_song(General &general);
 void prev_song(General &general);
 void start_playing(General &general, int playlist_index, Node *node);
 bool try_parse_int(const string &s, int &out);
+void show_songs_of_queue(General &general);
+void queue_menu(General &general);
 
 class Playlist{
 private:

@@ -7,7 +7,11 @@ using namespace std;
 void print_playbar(General &general){
     if(general.sourcery_reserve.size() > 0){
         if(general.sourcery_reserve.top() == "QUEUE"){
-            // PLAY FROM SOURCE QUEUE
+            cout << "------------------------------------------------" << endl;
+            cout << "Song Playing: " << general.q.front()->name << " - " << general.q.front()->artist << endl;
+            cout << "source: QUEUE" << endl;
+            cout << ">. Next" << endl;
+            cout << "------------------------------------------------" << endl;
         }
         else{
             if(general.now_playing_playlist_index == -1 || general.playlists[general.now_playing_playlist_index].name != general.sourcery_reserve.top()){
@@ -22,7 +26,7 @@ void print_playbar(General &general){
             }
             if(general.now_playing_playlist_index != -1){
                 Playlist &now_playing = general.playlists[general.now_playing_playlist_index];
-                if(!general.is_playing || now_playing.count == now_playing.count_songs_played){
+                if(!general.is_playing || general.is_current_playlist_done){
                     general.sourcery_reserve.pop();
                     if(!general.playlist_state_stack.empty() && general.playlist_state_stack.top().playlist_name == now_playing.name){
                         PlaylistState restored = general.playlist_state_stack.top();
@@ -39,8 +43,10 @@ void print_playbar(General &general){
                         now_playing.last_song_played = nullptr;
                     }
                     general.now_playing_playlist_index = -1;
+                    bool was_done = general.is_current_playlist_done;
+                    general.is_current_playlist_done = false;
                     cout << "###############################################################" << endl;
-                    if(!general.sourcery_reserve.empty() && general.is_current_playlist_done){
+                    if(!general.sourcery_reserve.empty() && was_done){
                         return print_playbar(general);
                     }
                     return;
@@ -70,12 +76,19 @@ void print_playbar(General &general){
     }
 }
 void next_song(General &general){
+    if(general.sourcery_reserve.top() == "QUEUE"){
+        general.q.pop();
+        if(general.q.empty()){
+            general.sourcery_reserve.pop();
+            cout << "###############################################################" << endl;
+            return;
+        }
+    }
     if(!general.is_playing || general.now_playing_node == nullptr) return;
     general.now_playing_node = general.now_playing_node->next;
     if(general.playlists[general.now_playing_playlist_index].count == general.playlists[general.now_playing_playlist_index].count_songs_played){
         general.is_current_playlist_done = true;
     }
-    // cout << "Song Playing: " << general.now_playing_node->song->name << " - " << general.now_playing_node->song->artist << endl;
 }
 void prev_song(General &general){
     if(!general.is_playing || general.now_playing_node == nullptr) return;
@@ -83,7 +96,6 @@ void prev_song(General &general){
     if(general.playlists[general.now_playing_playlist_index].count == general.playlists[general.now_playing_playlist_index].count_songs_played){
         general.is_current_playlist_done = true;
     }
-    // cout << "Song Playing: " << general.now_playing_node->song->name << " - " << general.now_playing_node->song->artist << endl;
 }
 void start_playing(General &general, int playlist_index, Node *node){
     if(playlist_index < 0 || playlist_index >= general.playlists.size() || node == nullptr) return;
@@ -91,6 +103,58 @@ void start_playing(General &general, int playlist_index, Node *node){
     general.now_playing_playlist_index = playlist_index;
     general.now_playing_node = node;
 }
+// ---------------------------------------------------------------------------------
+void show_songs_of_queue(General& general) {
+    auto temp = general.q;
+    int counter = 1;
+    while (!temp.empty()) {
+        auto s = temp.front();
+        cout << counter++ << ". " << s->name << ", by " << s->artist << '\n';
+        temp.pop();
+    }
+}
+void queue_menu(General &general){
+    print_playbar(general);
+    cout << "Songs in Queue:" << endl;
+    show_songs_of_queue(general);
+    cout << "-1. play \n0. back" << endl;
+    string choice;
+    cout << "your choice: "; 
+    cin >> choice;
+    if(choice.find('>') != string::npos){ next_song(general); return queue_menu(general); }
+    if(choice.find('<') != string::npos){ prev_song(general); return queue_menu(general); }
+    cout << "###############################################################\n";
+    int parsedChoice;
+    if(!try_parse_int(choice, parsedChoice)){
+        cout << "please enter a valid integer" << endl;
+        return queue_menu(general);
+    }
+    if(parsedChoice == 0)
+        return main_menu(general);
+    else if (parsedChoice == -1){
+        if (general.q.empty()) {
+            cout << "queue is empty" << endl;
+            cout << "###############################################################\n";
+            return queue_menu(general);
+        }
+        general.sourcery_reserve.push("QUEUE");
+        return queue_menu(general);
+    }
+    else{
+        general.back_history.push("QUEUE");
+        auto temp = general.q; 
+        for(int i = 1; !temp.empty(); ++i){
+            if(i == parsedChoice){
+                return temp.front()->menu(general);
+            }
+            temp.pop();
+        }
+        cout << "please enter a valid choice" << endl;
+        return queue_menu(general);
+
+    }
+}
+// ---------------------------------------------------------------------------------
 void Playlist::menu(General &general){
     print_playbar(general);
     cout << "playlist name: " << this->name << endl;
@@ -429,7 +493,10 @@ void Song::menu(General &general){
             cout << "###############################################################\n";
             return show_songs_list(general);
         }
-        // to be continued for other pages
+        else if(last_page == "QUEUE"){
+            cout << "###############################################################\n";
+            return queue_menu(general);
+        }
         else{
             for(int i = 0; i < general.playlists.size(); ++i){
                 if(general.playlists[i].name == last_page){
@@ -497,7 +564,17 @@ void Song::menu(General &general){
         }
     }
     else if(parsedChoice == 3){
-        // add_to_queue(general);
+        shared_ptr<Song> self;
+        for(auto &s : general.songs){
+            if(s.get() == this){   
+                self = s;
+                break;
+            }
+        }
+        general.q.push(self);
+        cout << "song added to queue" << endl;
+        cout << "###############################################################\n";
+        show_songs_list(general);
     }
 }
 void Song::write_playlists_of_song(General &general){
@@ -651,6 +728,13 @@ void main_menu(General &general){
         }
         else if(parsedChoice == 3)
             return show_playlists_list(general);
+        else if(parsedChoice == 4){
+            return queue_menu(general);
+        }
+        else{
+            cout << "please enter a valid choice" << endl;
+            return main_menu(general);
+        }
     }
 }
 int check_int(){
